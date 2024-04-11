@@ -5,6 +5,6 @@ The sensors that will be used for the application are:
     Temperature sensors (2*DS18B20)
     Voltage measurement sensor (ZMPT101B)
     Current measurement sensor (ACS712)
-The operation of our project is as follows: a liquid is poured into the heater, and a reference temperature at which the liquid will be heated is entered. Based on the quantity of liquid and the initial temperature, the energy consumed by the heater will be determined.
+The operation of my project is: a liquid is poured into the heater, and a reference temperature at which the liquid will be heated is entered. Based on the quantity of liquid and the initial temperature, the energy consumed by the heater will be determined.
 If the result is not acceptable, another reference can be entered. If the consumption is higher than expected, a warning will appear asking the user if they want to continue the heating process.
 For convenience and the nature of the execution element, we have opted to use a liquid heater.
