@@ -7,30 +7,29 @@
 #include <DallasTemperature.h>
 #include "ACS712.h"
 #include <ZMPT101B.h>
-#define SENSITIVITY 500.0f//stabilitate pt senzorul de tensiune
 
-///////////////////////////pt temp
+#define SENSITIVITY 500.0f // Sensitivity for voltage sensor
+
+/////////////////////////// For temperature
 #define ONE_WIRE_BUS 3
 OneWire oneWire(ONE_WIRE_BUS);
-// Pass our oneWire reference to Dallas Temperature. 
 DallasTemperature sensors(&oneWire);
-// arrays to hold device address
 DeviceAddress insideThermometer;
 int deviceCount = 0;
 float tempC1 = 0;
 float tempC2 = 0;
 ///////////////////////////
 
-///////////////////////pt ampermetru
+/////////////////////// For ampermeter
 ACS712  ACS(A1, 5.0, 1023, 100);
  /////////////////////////////////////
 
-////////////////////////pt voltmetru
+//////////////////////// For voltmeter
 ZMPT101B voltageSensor(A0, 50.0);
 /////////////////////////////////////
 
 LiquidCrystal_I2C lcd(0x27,16,2);
-//valori globale
+// Global variables
 volatile float valorSensorTemperatura;
 volatile int T = 50;
 const int trigPin = 9;
@@ -40,22 +39,30 @@ int distance = 15;
 int stare_proces = 0;
 
 void setup() {
-  // put your setup code here, to run once:
   Serial.begin(9600);
   Serial.println(F("Start!"));
-  pinMode(trigPin, OUTPUT); // Sets the trigPin as an Output
-  pinMode(echoPin, INPUT); // Sets the echoPin as an Input
+
+  // Set up ultrasonic sensor pins
+  pinMode(trigPin, OUTPUT);
+  pinMode(echoPin, INPUT); 
+
+ // Set up relay
   pinMode(53, OUTPUT);
   digitalWrite(53, HIGH);
+  
+  // Set up buttons
   pinMode(50, INPUT);
   pinMode(51, INPUT);
   pinMode(52, INPUT);
+
+  // Set up LCD
   lcd.init();
   lcd.clear();
   lcd.backlight();
   ACS.autoMidPoint();
   voltageSensor.setSensitivity(SENSITIVITY);
-  //initializare task-uri
+
+  // Initialize tasks
   xTaskCreate(Tasktemp1,"task7",configMINIMAL_STACK_SIZE,NULL, 6, NULL);
   xTaskCreate(TaskA,"task6",configMINIMAL_STACK_SIZE,NULL, 7, NULL);
   xTaskCreate(TaskV,"task5",configMINIMAL_STACK_SIZE,NULL, 8, NULL);
@@ -68,7 +75,8 @@ void setup() {
 
 void loop() {
 }
-//citirea butoanelor
+
+// Read buttons
 int buton1;
 int buton2;
 int buton3;
@@ -78,76 +86,71 @@ void Taskbutton(void *pvParameters) {
     buton2 = digitalRead(51);
     buton3 = digitalRead(52);
     if(buton1 == HIGH){
-      Serial.println(F("buton1 apasat"));////////ok button
+      Serial.println(F("button1 pressed"));
     }
     if(buton2 == HIGH){
-      Serial.println(F("buton2 apasat"));
+      Serial.println(F("button2 pressed"));
     }
     if(buton3 == HIGH){
-      Serial.println(F("buton3 apasat"));
+      Serial.println(F("button3 pressed"));
     }
-      vTaskDelay(500 / portTICK_PERIOD_MS);
+    vTaskDelay(500 / portTICK_PERIOD_MS);
   }
 }
 
-//citirea temperaturii
+// Read temperature
 void Tasktemp1(void *pvParameters) {
   while (1) {
-    Serial.println("merge T");
+    Serial.println("temperature task running");
     if(stare_proces == 5){
-      
       sensors.requestTemperatures();      
       tempC1 = sensors.getTempCByIndex(0);
-      Serial.print("temperatura1: ");
+      Serial.print("temperature1: ");
       Serial.println(tempC1);
       tempC2 = sensors.getTempCByIndex(1);
-      Serial.print("temperatura2: ");
+      Serial.print("temperature2: ");
       Serial.print(tempC2);
       vTaskDelay(500 / portTICK_PERIOD_MS);
     }
   }
 }
 
-//citirea curentului
+// Read current
 float A;
 void TaskA(void *pvParameters) {
   while (1) {
-    Serial.println("merge A");
+    Serial.println("current task running");
     if(stare_proces == 5){
       float average = 0;
-       uint32_t start = millis();
-       for (int i = 0; i < 10; i++)
-       {
-         //  select appropriate function
-         //  average += ACS.mA_AC_sampling();
-         average += ACS.mA_AC();
-       }
-       A = average / 10000.0;
-       uint32_t duration = millis() - start;
-       Serial.print("amp : ");
-       Serial.print(A);
-       vTaskDelay(501 / portTICK_PERIOD_MS);
+      uint32_t start = millis();
+      for (int i = 0; i < 10; i++) {
+        average += ACS.mA_AC();
+      }
+      A = average / 10000.0;
+      uint32_t duration = millis() - start;
+      Serial.print("amp : ");
+      Serial.print(A);
+      vTaskDelay(501 / portTICK_PERIOD_MS);
     }
   }
 }
 
-//citirea tensiunii
+// Read voltage
 float voltage;
 void TaskV(void *pvParameters) {
   while (1) {
-    Serial.println("merge v");
+    Serial.println("voltage task running");
     if(stare_proces == 5){
-      
       voltage = voltageSensor.getRmsVoltage();
       voltage = voltage * 0.88;
-      Serial.print("voltaj: ");
+      Serial.print("voltage: ");
       Serial.print(voltage);
       vTaskDelay(502 / portTICK_PERIOD_MS); 
     }
   }
 }
 
-//introducerea referintei
+// Input reference value
 void Taskreferinta(void *pvParameters) {
   while (1) {
     if(stare_proces == 3 ){
@@ -158,10 +161,9 @@ void Taskreferinta(void *pvParameters) {
   }
 }
 
-//evaluarea distantei pt calcularea volumului lchidului
+// Evaluate distance for liquid volume calculation
 void Taskdist(void *pvParameters)  {
-  while(1)
-  { 
+  while(1) { 
     if(stare_proces == 1){
       digitalWrite(trigPin, LOW);
       vTaskDelay(2 / portTICK_PERIOD_MS);
@@ -170,32 +172,32 @@ void Taskdist(void *pvParameters)  {
       digitalWrite(trigPin, LOW);
       duration = pulseIn(echoPin, HIGH);
       distance = duration * 0.034 / 2;
-      distance = 12;
+      //distance = 12; Experimental value
       vTaskDelay(500 / portTICK_PERIOD_MS);
     } 
   }
 }
 
-////hmi
+//// HMI
 long consum;
 double t_inceput;
 double t_curent;
 double t_acum;
 float consum_acum = 0;
 void Taskprint(void *pvParameters)  {
-  while(1)
-  { /////////////////////////////////////////////////////////////////starea 0(Buna ziua)    
+  while(1) { 
+    // State 0 (Good day)
     if(stare_proces == 0) {
       lcd.setCursor(0,0);
-      lcd.print("Buna ziua!");
+      lcd.print("Good day!");
       vTaskDelay(1800 / portTICK_PERIOD_MS);
       lcd.clear();
       stare_proces++;
     }
-    /////////////////////////////////////////////////////////////////starea 1 / inceperea procesului
+    // State 1 (Process start)
     if(stare_proces == 1) {
-      ///////////////////ALG MESAJ MESAJ LUNG ON
-      String message = "Lasati capacul jos";
+      // Long message ON
+      String message = "Keep the lid down";
       for (int i=0; i < 16; i++) {
         message = " " + message;  
       }  
@@ -206,54 +208,52 @@ void Taskprint(void *pvParameters)  {
         lcd.setCursor(0, 0);
         lcd.print(message.substring(position, position + 16));
         lcd.setCursor(0,1);
-        lcd.print("Apasati ok");
+        lcd.print("Press ok");
         vTaskDelay(400 / portTICK_PERIOD_MS);
       }
-      ///////////////////ALG MESAJ MESAJ LUNG off
+      // Long message OFF
       if(buton1 == HIGH){
         lcd.clear();
         stare_proces ++;
       }
     }
-    /////////////////////////////////////////////////////////////////starea 2 / calcularea volumului
+    // State 2 (Volume calculation)
     if(stare_proces == 2) {
       lcd.setCursor(0,0);
-      lcd.print("Se proceseaza");
+      lcd.print("Processing");
       vTaskDelay(600 / portTICK_PERIOD_MS);
-      if(distance < 20 && distance > 1){/////////////valori experimentale
+      if(distance < 20 && distance > 1){ // Experimental values
         lcd.clear();
         stare_proces ++;
-      }else{
+      } else {
         lcd.clear();
         lcd.setCursor(0,0);
-        /////////////////////////scrollMessage(0,"Cantitate de apa nonconforma", 250, 16);
-        ///////////////////ALG MESAJ MESAJ LUNG ON
-      String message = "Cantitate de apa nonconforma";
-      for (int i=0; i < 16; i++) {
-        message = " " + message;  
-      }  
-      message = message + " "; 
-      for (int position = 0; position < message.length(); position++) {
-        if(buton1 == HIGH)
-          break;
-        lcd.setCursor(0, 0);
-        lcd.print(message.substring(position, position + 16));
-        vTaskDelay(400 / portTICK_PERIOD_MS);
-      }
-      ///////////////////ALG MESAJ MESAJ LUNG off
-      String message1 = "Schimbati catitatea de lichid";
-      for (int i=0; i < 16; i++) {
-        message1 = " " + message1;  
-      }  
-      message1 = message1 + " "; 
-      for (int position = 0; position < message1.length(); position++) {
-        if(buton1 == HIGH)
-          break;
-        lcd.setCursor(0, 0);
-        lcd.print(message1.substring(position, position + 16));
-        vTaskDelay(400 / portTICK_PERIOD_MS);
-      }
-      ///////////////////ALG MESAJ MESAJ LUNG off
+        // Long message ON
+        String message = "Non-conforming liquid amount";
+        for (int i=0; i < 16; i++) {
+          message = " " + message;  
+        }  
+        message = message + " "; 
+        for (int position = 0; position < message.length(); position++) {
+          if(buton1 == HIGH)
+            break;
+          lcd.setCursor(0, 0);
+          lcd.print(message.substring(position, position + 16));
+          vTaskDelay(400 / portTICK_PERIOD_MS);
+        }
+        // Long message OFF
+        String message1 = "Change the liquid amount";
+        for (int i=0; i < 16; i++) {
+          message1 = " " + message1;  
+        }  
+        message1 = message1 + " "; 
+        for (int position = 0; position < message1.length(); position++) {
+          if(buton1 == HIGH)
+            break;
+          lcd.setCursor(0, 0);
+          lcd.print(message1.substring(position, position + 16));
+          vTaskDelay(400 / portTICK_PERIOD_MS);
+        }
         lcd.setCursor(0,1);
         lcd.print(distance);
         vTaskDelay(1600 / portTICK_PERIOD_MS);
@@ -261,11 +261,11 @@ void Taskprint(void *pvParameters)  {
         stare_proces = 1;
       }
     }
-    /////////////////////////////////////////////////////////////////starea 3 / alegerea referintei
+    // State 3 (Reference selection)
     if(stare_proces == 3){
       lcd.setCursor(0,0);
-       ///////////////////ALG MESAJ MESAJ LUNG ON
-      String message = "Introduceti referinta";
+      // Long message ON
+      String message = "Enter reference";
       for (int i=0; i < 16; i++) {
         message = " " + message;  
       }  
@@ -283,20 +283,19 @@ void Taskprint(void *pvParameters)  {
         lcd.setCursor(10,1);
         lcd.print("ok");
         vTaskDelay(500 / portTICK_PERIOD_MS);
-        
       }
-      ///////////////////ALG MESAJ MESAJ LUNG off
+      // Long message OFF
       if(buton1 == HIGH){
         lcd.clear();
         vTaskDelay(500 / portTICK_PERIOD_MS);
         stare_proces ++;
       }
     }
-    /////////////////////////////////////////////////////////////////starea 4 / calculul volumului si algoritmul de predictie
+    // State 4 (Volume calculation and prediction algorithm)
     if(stare_proces == 4){
       consum = 63.27 * ((18 - distance) * 0.176625) + 1.37 * (T - 22) - 64.01;
       lcd.setCursor(0, 0);
-      lcd.print("predict cons:");
+      lcd.print("predicted cons:");
       lcd.setCursor(14, 0);
       lcd.print(consum);
       lcd.setCursor(0, 1);
@@ -307,22 +306,22 @@ void Taskprint(void *pvParameters)  {
         T = T - 2;
         lcd.setCursor(0, 0);
         t_inceput = millis();
-        lcd.print("Consum:");
+        lcd.print("Consumption:");
         lcd.setCursor(8, 0);
         lcd.print("Temps:");
         digitalWrite(53, LOW);
         stare_proces = 5;
       }
-      if(buton2 == HIGH){///////////////////////////////////reintroduce referinta
+      if(buton2 == HIGH){ // Reintroduce reference
         lcd.clear();
         stare_proces = 3;
       }
-      if(buton3 == HIGH){///////////////////////////////////mod ceai
+      if(buton3 == HIGH){ // Tea mode
         lcd.clear();
         A = 0;
         T = 70;
         lcd.setCursor(0, 0);
-        lcd.print("Noul consum:");
+        lcd.print("New consumption:");
         consum = 63.27 * (18 - distance) * 7.25 * 7.25 * 3.14 + 1.37 * (T - 22) - 64.01;
         lcd.setCursor(0, 1);
         lcd.print(consum);
@@ -331,7 +330,7 @@ void Taskprint(void *pvParameters)  {
         stare_proces = 8;
       }
     }
-    /////////////////////////////////////////////////////////////////starea 5 / urmarirea referintei si calculul consumului de energie live
+    // State 5 (Reference tracking and live energy consumption calculation)
     if(stare_proces == 5){
       t_curent =  millis();
       t_acum =(t_curent - t_inceput) / 1000 * 0.000277778;
@@ -351,14 +350,14 @@ void Taskprint(void *pvParameters)  {
         stare_proces ++;
       }
     }
-    //////////////////////////////////////////////////////////////////starea 6 / final
+    // State 6 (Final)
     if(stare_proces == 6){
       lcd.setCursor(0, 0);
-      lcd.print("Consumul este:");
+      lcd.print("Consumption:");
       lcd.setCursor(0, 1);
       lcd.print(consum_acum);
     }
-    //////////////////////////////////////////////////////////////////starea 8 / mod ceai step1
+    // State 8 (Tea mode step1)
     if(stare_proces == 8){
       t_curent =  millis();
       t_acum =(t_curent - t_inceput) / 1000 * 0.000277778;
@@ -376,7 +375,7 @@ void Taskprint(void *pvParameters)  {
         digitalWrite(53, HIGH);
         lcd.clear();
         stare_proces = 6;
-   }
-}
-}
+      }
+    }
+  }
 }
